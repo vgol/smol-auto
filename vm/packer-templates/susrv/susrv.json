@@ -1,0 +1,94 @@
+{
+  "provisioners": [
+    {
+      "type": "shell",
+      "scripts": [
+        "../shared/devel-repo.sh",
+        "../shared/build-essential.sh",
+        "../shared/linux-headers.sh",
+        "../shared/virtualbox.sh",
+        "../shared/rm-udev-persistent-net.sh",
+        "../shared/passwd1.sh",
+        "../shared/wicd.sh",
+        "../shared/ntpdate.sh",
+        "../shared/vim.sh",
+        "./hosts.sh"
+      ],
+      "override": {
+        "virtualbox-iso": {
+          "execute_command": "echo '11111111' | sudo -S bash '{{.Path}}'"
+        }
+      }
+    }
+  ],
+  "builders": [
+    {
+      "type": "virtualbox-iso",
+      "boot_command": [
+        "<esc><ecs><down><esc><enter><wait><wait>",
+        "install auto=true vga=788 url=http://{{ .HTTPIP }}:{{ .HTTPPort }}/preseed.cfg <wait>",
+        "debian-installer/locale=en_US console-keymaps-at/keymap=ru <wait>",
+        "hostname=susrv domain=rtfm.rbt <wait>",
+        "astra-license/license=true <wait>",
+        "initrd=/netinst/initrd.gz <enter><wait>"
+      ],
+      "boot_wait": "3s",
+      "disk_size": 16000,
+      "hard_drive_interface": "sata",
+      "iso_interface": "sata",
+      "guest_os_type": "Debian_64",
+      "headless": "{{user `headless`}}",
+      "vm_name":"susrv",
+      "output_directory":"export",
+      "http_directory": "http",
+      "iso_checksum": "010c0d2c073f186a268de61339f9772d",
+      "iso_checksum_type": "none",
+      "iso_url": "/home/vgol/iso-image/smolensk-current.iso",
+      "ssh_username": "u",
+      "ssh_password": "qwertyui",
+      "ssh_port": 22,
+      "ssh_wait_timeout": "30m",
+      "shutdown_command": "echo 'halt -p' > shutdown.sh; echo '11111111' | sudo -S bash 'shutdown.sh'",
+      "guest_additions_path": "VBoxGuestAdditions_{{.Version}}.iso",
+      "virtualbox_version_file": ".vbox_version",
+      "export_opts" : [ "--ovf20", "--options", "manifest" ],
+      "format": "ova",
+      "vboxmanage": [
+        [ "modifyvm", "{{.Name}}", "--cpus", "2", "--cpuexecutioncap", "90" ],
+        [ "modifyvm", "{{.Name}}", "--pae", "on", "--ioapic", "on", "--chipset", "ich9" ],
+
+        [ "modifyvm", "{{.Name}}", "--memory", "2048" ],
+
+        [ "modifyvm", "{{.Name}}", "--vram", "32" ],
+        [ "modifyvm", "{{.Name}}", "--accelerate2dvideo", "on" ],
+
+        [ "modifyvm", "{{.Name}}", "--audio", "alsa" ],
+        [ "modifyvm", "{{.Name}}", "--nictype1", "virtio" ],
+
+        [ "storagectl", "{{.Name}}", "--name", "SATA Controller", "--hostiocache", "on" ],
+        [ "storagectl", "{{.Name}}", "--name", "IDE Controller", "--remove" ],
+
+        [ "modifyvm", "{{.Name}}", "--usbehci", "on" ],
+
+        [ "modifyvm", "{{.Name}}", "--vrde", "on", "--vrdeauthtype", "external", "--vrdeauthlibrary", "VBoxAuth" ]
+      ],
+      "vboxmanage_post": [
+        [ "modifyvm", "{{.Name}}", "--accelerate3d", "on" ],
+        [ "modifyvm", "{{.Name}}", "--accelerate2dvideo", "off" ],
+        [ "sharedfolder", "add", "{{.Name}}", "--name", "git", "--hostpath", "/home/vgol/git", "--automount" ],
+        [ "sharedfolder", "add", "{{.Name}}", "--name", "svn", "--hostpath", "/home/vgol/svn", "--automount" ],
+
+        [ "storageattach", "{{.Name}}", "--storagectl", "SATA Controller",
+          "--port", "1", "--type", "dvddrive", "--medium", "emptydrive" ],
+        [ "modifyvm", "{{.Name}}", "--vrde", "off" ],
+        [ "modifyvm", "{{.Name}}", "--mouse", "usb" ],
+        [ "modifyvm", "{{.Name}}", "--nic1", "hostonly" ],
+        [ "modifyvm", "{{.Name}}", "--cableconnected1", "on" ],
+        [ "modifyvm", "{{.Name}}", "--hostonlyadapter1", "vboxnet0" ],
+        [ "modifyvm", "{{.Name}}", "--macaddress1", "08002773E51C" ],
+        [ "modifyvm", "{{.Name}}", "--clipboard", "bidirectional" ],
+        [ "modifyvm", "{{.Name}}", "--draganddrop", "bidirectional" ]
+      ]
+    }
+  ]
+}
