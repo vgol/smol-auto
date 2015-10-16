@@ -7,6 +7,7 @@
 import subprocess
 import os
 import shutil
+import errno
 import paths
 
 
@@ -36,19 +37,27 @@ class VirtualMachine:
                                       stderr=devnull
                                       )
             except subprocess.CalledProcessError:
-                if os.path.exists(os.path.join(paths.registered_vms, self.name)):
-                    return 0
+                return 0
         raise VirtualMachineExistError("{} already exist!".format(self.name))
 
     def removevm(self):
         """Unregister and remove Virtualbox virtual machine."""
-        subprocess.call(['VboxManage', 'unregistervm', self.name])
-        shutil.rmtree(os.path.join(paths.registered_vms, self.name))
+        with open('/dev/null') as devnull:
+            subprocess.call(['VboxManage', 'unregistervm', self.name],
+                            stderr=devnull)
+        try:
+            shutil.rmtree(os.path.join(paths.registered_vms, self.name))
+        except OSError as exc:
+            if exc.errno == errno.ENOENT:
+                pass
+            else:
+                raise
+        return 0
 
     def buildvm(self):
+        """Build and export the virtual machine."""
         curdir = os.getcwd()
         packer_main = os.path.join(paths.packer, 'bin', 'packer')
-        print(packer_main)
         os.chdir(self.dir)
         subprocess.call([packer_main, 'build', '-force',
                          '-var', 'headless=true', self.template])
