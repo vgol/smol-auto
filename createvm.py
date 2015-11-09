@@ -43,7 +43,7 @@ class VirtualMachine:
     def removevm(self):
         """Unregister and remove Virtualbox virtual machine."""
         with open('/dev/null') as devnull:
-            subprocess.call(['VboxManage', 'unregistervm', self.name],
+            subprocess.call(['VBoxManage', 'unregistervm', self.name],
                             stderr=devnull)
         try:
             shutil.rmtree(os.path.join(paths.registered_vms, self.name))
