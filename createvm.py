@@ -15,10 +15,18 @@ __author__ = 'vgol'
 
 
 class VirtualMachineExistError(Exception):
+    """VirtualMachine.checkvm() raise this exception if VM exists."""
     pass
 
 
 class VirtualMachine:
+    """Main class for VM handling.
+
+    The constructor expects a name of Virtual Machine. It also gets some
+    path to Packer templates from paths.py module. Through this class
+    methods it is possible to build VM, to check if such VM already exists
+    and to remove specified VM.
+    """
     def __init__(self, name):
         self.name = name
         self.dir = os.path.join(paths.packer, 'templates', name)
@@ -56,18 +64,27 @@ class VirtualMachine:
 
     def buildvm(self):
         """Build and export the virtual machine."""
-        curdir = os.getcwd()
+        templ = os.path.join(self.dir, self.template)
+        assert os.path.exists(templ), "%s not found" % self.template
         packer_main = os.path.join(paths.packer, 'bin', 'packer')
+        assert os.path.exists(packer_main),\
+            "Packer executable -- %s -- not found" % packer_main
+        curdir = os.getcwd()
         os.chdir(self.dir)
         subprocess.call([packer_main, 'build', '-force',
                          '-var', 'headless=true', self.template])
         os.chdir(curdir)
 
-if __name__ == '__main__':
-    vm = VirtualMachine('sudcm')
-    print(vm)
+
+def build_vm(vmname):
+    """Build virtual machine. Remove existing if needed."""
+    v_machine = VirtualMachine(vmname)
     try:
-        vm.checkvm()
+        v_machine.checkvm()
     except VirtualMachineExistError:
-        vm.removevm()
-    vm.buildvm()
+        v_machine.removevm()
+    v_machine.buildvm()
+
+
+if __name__ == '__main__':
+    build_vm('sudcm')
