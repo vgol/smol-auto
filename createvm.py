@@ -9,6 +9,7 @@ import os
 import shutil
 import errno
 import paths
+import multiprocessing
 
 
 __author__ = 'vgol'
@@ -76,6 +77,30 @@ class VirtualMachine:
         os.chdir(curdir)
 
 
+class Builder:
+    """Build given list of virtual machines.
+
+    Constructor require list of VMs as first positional argument.
+    It is safe to specify single string here.
+    Optional argument threads specify the count of worker processes
+    those will actually build VMs from vmlist. The default is
+    multiprocessing.cpu_count().
+    """
+    def __init__(self, vmlist, threads=multiprocessing.cpu_count()):
+        self.vmlist = list(vmlist)
+        self.threads = threads
+
+    def __str__(self):
+        return "VM list:\n%s" % '\n'.join(self.vmlist)
+
+    def build(self):
+        """Build VMs from self.vmlist."""
+        pool = multiprocessing.Pool(processes=self.threads)
+        pool.map_async(build_vm, self.vmlist)
+        pool.close()
+        pool.join()
+
+
 def build_vm(vmname):
     """Build virtual machine. Remove existing if needed."""
     v_machine = VirtualMachine(vmname)
@@ -87,4 +112,7 @@ def build_vm(vmname):
 
 
 if __name__ == '__main__':
-    build_vm('sudcm')
+    # Test code
+    bld = Builder(['sudcm', 'sufs', 'suac', 'susrv'])
+    print(bld)
+    bld.build()
