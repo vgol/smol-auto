@@ -10,6 +10,7 @@ import shutil
 import errno
 import paths
 import multiprocessing
+import argparse
 
 
 __author__ = 'vgol'
@@ -101,6 +102,66 @@ class Builder:
         pool.join()
 
 
+class Importer:
+    """Import VMs
+
+    """
+    pass
+
+
+class Interface:
+    """Options handler.
+
+    """
+    desc = "Virtual machines building and importing tool."
+
+    def __init__(self):
+        # Create top-level parser.
+        self.parser = argparse.ArgumentParser(description=self.desc)
+        subhelp = "See 'subcommand -h' for details"
+        subparsers = self.parser.add_subparsers(help=subhelp)
+
+        # Create parser for build command.
+        build_help = """Build a number of virtual machines.
+                    If no VM name specified it will try to discover
+                    all templates from Packer 'templates' directory
+                    and build VMs.
+                    """
+        parser_build = subparsers.add_parser('build', help=build_help)
+        parser_build.add_argument('VM_NAME',
+                                  nargs='*',
+                                  help='virtual machine name'
+                                  )
+        parser_build.add_argument('-f', '--force',
+                                  action='store_true',
+                                  help='delete existing VM images'
+                                  )
+        parser_build.add_argument('-m', '--mail',
+                                  action='store_true',
+                                  help='send mail about new VM images'
+                                  )
+
+        # Create parser for import command.
+        import_help = """Import specified virtual machines and group
+                    then into 'smolensk_unstable'. If a directory
+                    given as argument all images from directory
+                    will be imported.
+                    """
+        parser_import = subparsers.add_parser('import', help=import_help)
+        parser_import.add_argument('NAME',
+                                   nargs='+',
+                                   help='path to image or directory'
+                                   )
+        parser_import.add_argument('-f', '--force',
+                                   action='store_true',
+                                   help='delete existing VMs'
+                                   )
+
+    def get_args(self):
+        """Parse arguments from command line."""
+        return self.parser.parse_args()
+
+
 def build_vm(vmname):
     """Build virtual machine. Remove existing if needed."""
     v_machine = VirtualMachine(vmname)
@@ -113,6 +174,9 @@ def build_vm(vmname):
 
 if __name__ == '__main__':
     # Test code
-    bld = Builder(['sudcm', 'sufs', 'suac', 'susrv'])
-    print(bld)
-    bld.build()
+    # bld = Builder(['sudcm', 'sufs', 'suac', 'susrv', 'sudcs', 'suodcm', 'suoac'])
+    # print(bld)
+    # bld.build()
+    iface = Interface()
+    iface.get_args()
+    print(iface.get_args())
