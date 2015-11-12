@@ -11,6 +11,7 @@ import errno
 import paths
 import multiprocessing
 import argparse
+import time
 
 
 __author__ = 'vgol'
@@ -87,8 +88,13 @@ class Builder:
     those will actually build VMs from vmlist. The default is
     multiprocessing.cpu_count().
     """
+    TIMEOUT = 30
+
     def __init__(self, vmlist, threads=multiprocessing.cpu_count()):
-        self.vmlist = list(vmlist)
+        if isinstance(vmlist, str):
+            self.vmlist = [vmlist]
+        else:
+            self.vmlist = vmlist
         self.threads = threads
 
     def __str__(self):
@@ -97,7 +103,9 @@ class Builder:
     def build(self):
         """Build VMs from self.vmlist."""
         pool = multiprocessing.Pool(processes=self.threads)
-        pool.map_async(build_vm, self.vmlist)
+        for vm in self.vmlist:
+            pool.apply_async(build_vm, args=(vm,))
+            time.sleep(self.TIMEOUT)
         pool.close()
         pool.join()
 
@@ -174,7 +182,7 @@ def build_vm(vmname):
 
 if __name__ == '__main__':
     # Test code
-    # bld = Builder(['sudcm', 'sufs', 'suac', 'susrv', 'sudcs', 'suodcm', 'suoac'])
+    # bld = Builder(['sudcm', 'sufs', 'suac', 'susrv', 'sudcs', 'suodcm', 'suoac'], threads=4)
     # print(bld)
     # bld.build()
     iface = Interface()
