@@ -85,7 +85,7 @@
         [ "modifyvm", "{{.Name}}", "--nic1", "hostonly" ],
         [ "modifyvm", "{{.Name}}", "--cableconnected1", "on" ],
         [ "modifyvm", "{{.Name}}", "--hostonlyadapter1", "vboxnet0" ],
-        [ "modifyvm", "{{.Name}}", "--macaddress1", "08002793D32B" ],
+        [ "modifyvm", "{{.Name}}", "--macaddress1", "08002764AF57" ],
         [ "modifyvm", "{{.Name}}", "--clipboard", "bidirectional" ],
         [ "modifyvm", "{{.Name}}", "--draganddrop", "bidirectional" ]
       ]
