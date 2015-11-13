@@ -32,7 +32,7 @@ class VirtualMachine:
     """
     def __init__(self, name):
         self.name = name
-        self.dir = os.path.join(paths.packer, 'templates', name)
+        self.dir = os.path.join(paths.packer_templates, name)
         self.template = '{}.json'.format(name)
 
     def __str__(self):
