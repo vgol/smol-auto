@@ -8,10 +8,10 @@ import subprocess
 import os
 import shutil
 import errno
-import paths
 import multiprocessing
 import argparse
 import time
+import paths
 
 
 __author__ = 'vgol'
@@ -79,6 +79,21 @@ class VirtualMachine:
         os.chdir(curdir)
 
 
+def build_vm(vmname):
+    """Build virtual machine. Remove existing if needed."""
+    v_machine = VirtualMachine(vmname)
+    try:
+        v_machine.checkvm()
+    except VirtualMachineExistError:
+        v_machine.removevm()
+    v_machine.buildvm()
+
+
+def count_workers():
+    """Determine a number of processes for pool. Return int."""
+    return multiprocessing.cpu_count() // 2
+
+
 class Builder:
     """Build given list of virtual machines.
 
@@ -90,7 +105,7 @@ class Builder:
     """
     TIMEOUT = 30
 
-    def __init__(self, vmlist, threads=multiprocessing.cpu_count()):
+    def __init__(self, vmlist, threads=count_workers()):
         if isinstance(vmlist, str):
             self.vmlist = [vmlist]
         else:
@@ -100,14 +115,31 @@ class Builder:
     def __str__(self):
         return "VM list:\n%s" % '\n'.join(self.vmlist)
 
-    def build(self):
-        """Build VMs from self.vmlist."""
-        pool = multiprocessing.Pool(processes=self.threads)
-        for vm in self.vmlist:
+    # def _callback(self, vm):
+    #     print("{} successfully built".format(vm))
+    #     time.sleep(self.TIMEOUT)
+
+    def _build_pool(self, procs, lst):
+        pool = multiprocessing.Pool(processes=procs)
+        for vm in lst:
             pool.apply_async(build_vm, args=(vm,))
             time.sleep(self.TIMEOUT)
         pool.close()
         pool.join()
+
+    def build(self):
+        """Build VMs from self.vmlist."""
+        vm_number = len(self.vmlist)
+        if vm_number == 1:
+            build_vm(self.vmlist[0])
+        elif vm_number <= self.threads:
+            self._build_pool(vm_number, self.vmlist)
+
+        else:
+            tmplist = self.vmlist
+            while tmplist:
+                self._build_pool(self.threads, tmplist[:self.threads])
+                tmplist = tmplist[self.threads:]
 
 
 class Importer:
@@ -170,21 +202,13 @@ class Interface:
         return self.parser.parse_args()
 
 
-def build_vm(vmname):
-    """Build virtual machine. Remove existing if needed."""
-    v_machine = VirtualMachine(vmname)
-    try:
-        v_machine.checkvm()
-    except VirtualMachineExistError:
-        v_machine.removevm()
-    v_machine.buildvm()
-
-
 if __name__ == '__main__':
     # Test code
-    # bld = Builder(['sudcm', 'sufs', 'suac', 'susrv', 'sudcs', 'suodcm', 'suoac'], threads=4)
-    # print(bld)
-    # bld.build()
-    iface = Interface()
-    iface.get_args()
-    print(iface.get_args())
+    bld = Builder(['sudcm', 'sufs', 'suac', 'susrv', 'sudcs', 'suodcm', 'suoac'])
+    # bld = Builder(['sudcm'])
+    # bld = Builder(['sudcm', 'sufs', 'suodcm'])
+    print(bld)
+    bld.build()
+    # iface = Interface()
+    # iface.get_args()
+    # print(iface.get_args())
