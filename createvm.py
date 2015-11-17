@@ -77,6 +77,8 @@ class VirtualMachine:
         subprocess.call([packer_main, 'build', '-force',
                          '-var', 'headless=true', self.template])
         os.chdir(curdir)
+        return os.path.join(self.dir, paths.packer_export,
+                            self.name + '.ova')
 
 
 def build_vm(vmname):
@@ -86,7 +88,7 @@ def build_vm(vmname):
         v_machine.checkvm()
     except VirtualMachineExistError:
         v_machine.removevm()
-    v_machine.buildvm()
+    return v_machine.buildvm()
 
 
 def count_workers():
@@ -103,7 +105,8 @@ class Builder:
     those will actually build VMs from vmlist. The default is
     multiprocessing.cpu_count().
     """
-    TIMEOUT = 30
+    _TIMEOUT = 30
+    results = []
 
     def __init__(self, vmlist, threads=count_workers()):
         if isinstance(vmlist, str):
@@ -115,15 +118,15 @@ class Builder:
     def __str__(self):
         return "VM list:\n%s" % '\n'.join(self.vmlist)
 
-    # def _callback(self, vm):
-    #     print("{} successfully built".format(vm))
-    #     time.sleep(self.TIMEOUT)
+    def _callback(self, vm):
+        print("{} successfully built".format(vm))
+        self.results.append(vm)
 
     def _build_pool(self, procs, lst):
         pool = multiprocessing.Pool(processes=procs)
         for vm in lst:
-            pool.apply_async(build_vm, args=(vm,))
-            time.sleep(self.TIMEOUT)
+            pool.apply_async(build_vm, args=(vm,), callback=self._callback)
+            time.sleep(self._TIMEOUT)
         pool.close()
         pool.join()
 
@@ -131,15 +134,72 @@ class Builder:
         """Build VMs from self.vmlist."""
         vm_number = len(self.vmlist)
         if vm_number == 1:
-            build_vm(self.vmlist[0])
+            ova = build_vm(self.vmlist[0])
+            self.results.append(ova)
         elif vm_number <= self.threads:
             self._build_pool(vm_number, self.vmlist)
-
         else:
             tmplist = self.vmlist
             while tmplist:
                 self._build_pool(self.threads, tmplist[:self.threads])
                 tmplist = tmplist[self.threads:]
+        return self.results
+
+    @staticmethod
+    def _upload_dir():
+        """Create the directory using current date."""
+        upldir = os.path.join(paths.upload, time.strftime('%d-%m-%Y'))
+        print("Upload directory: {}".format(upldir))
+        try:
+            os.mkdir(upldir)
+        except OSError as exc:
+            # If directory already exists just warn but
+            #  don't raise the exception.
+            if exc.errno == errno.EEXIST:
+                print("WARNING: Directory already exist!",
+                      "All images will be replaced!")
+            else:
+                raise
+        return upldir
+
+    @staticmethod
+    def _remove_existing(img):
+        """Remove img. Return img if removed. Else None."""
+        if os.path.exists(img):
+            os.unlink(img)
+            return img
+
+    def upload(self, ignore_missing=True):
+        """Move VM images to paths.upload directory."""
+        assert self.results, "Parameter 'results' is empty."
+        upload_to = self._upload_dir()
+        uploaded = []
+        for image in self.results:
+            basename = os.path.split(image)[1]
+            dest = os.path.join(upload_to, basename)
+            self._remove_existing(dest)
+            try:
+                shutil.move(image, upload_to)
+                os.chmod(dest, 0o0644)
+            except IOError as imgexc:
+                # If ignore_missing is True then check for errno.
+                # Else raise exception.
+                if ignore_missing:
+                    # Do not raise exception if image file not found.
+                    if (imgexc.errno == errno.ENOENT and
+                            imgexc.filename == image):
+                        print("{} is missing. Skipping...")
+                    else:
+                        raise
+                else:
+                    raise
+            else:
+                uploaded.append(os.path.split(image)[1])
+        return upload_to, uploaded
+
+    def mail(self):
+        """Send mail to employees."""
+        print("Not implemented")
 
 
 class Importer:
@@ -172,10 +232,6 @@ class Interface:
                                   nargs='*',
                                   help='virtual machine name'
                                   )
-        parser_build.add_argument('-f', '--force',
-                                  action='store_true',
-                                  help='delete existing VM images'
-                                  )
         parser_build.add_argument('-m', '--mail',
                                   action='store_true',
                                   help='send mail about new VM images'
@@ -196,19 +252,47 @@ class Interface:
                                    action='store_true',
                                    help='delete existing VMs'
                                    )
+        self.args = self.parser.parse_args()
 
-    def get_args(self):
-        """Parse arguments from command line."""
-        return self.parser.parse_args()
+    @staticmethod
+    def _discover():
+        """Look into Packer templates dir and return template's list."""
+        vms = []
+        for file in os.listdir(paths.packer_templates):
+            json = os.path.join(paths.packer_templates,
+                                file, file + '.json')
+            if os.path.exists(json):
+                vms.append(file)
+        return vms
+
+    def _build(self):
+        """Build and upload VMs through Builder class methods
+
+        Build from given as arguments list of VMs. If no arguments
+        given then call self._discover to determine the list of VMs
+        from existing Packer templates.
+        """
+        if self.args.VM_NAME:
+            bld = Builder(self.args.VM_NAME)
+        else:
+            bld = Builder(self._discover())
+        bld.build()
+        result = bld.upload()
+        if self.args.mail:
+            bld.mail()
+        return result
+
+    def _import(self):
+        pass
+
+    def main(self):
+        """docstring will be here..."""
+        if hasattr(self.args, 'VM_NAME'):
+            self._build()
+        else:
+            self._import()
 
 
 if __name__ == '__main__':
-    # Test code
-    bld = Builder(['sudcm', 'sufs', 'suac', 'susrv', 'sudcs', 'suodcm', 'suoac'])
-    # bld = Builder(['sudcm'])
-    # bld = Builder(['sudcm', 'sufs', 'suodcm'])
-    print(bld)
-    bld.build()
-    # iface = Interface()
-    # iface.get_args()
-    # print(iface.get_args())
+    iface = Interface()
+    iface.main()
