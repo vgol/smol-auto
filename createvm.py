@@ -22,6 +22,21 @@ class VirtualMachineExistError(Exception):
     pass
 
 
+def get_machine_folder():
+    """Determine default machine folder. Return str."""
+    properties = subprocess.check_output(['VBoxManage', 'list',
+                                          'systemproperties'])
+    prop_name = "Default machine folder:"
+    skip = len(prop_name)
+    machine_folder = ''
+    for line in properties.decode().split('\n'):
+        if prop_name in line:
+            machine_folder = line[skip:].lstrip()
+            break
+    assert machine_folder != '', "Default machine folder is unknown"
+    return machine_folder
+
+
 class VirtualMachine:
     """Main class for VM handling.
 
@@ -31,6 +46,7 @@ class VirtualMachine:
     and to remove specified VM.
     """
     def __init__(self, name):
+        assert os.path.exists('/usr/bin/VBoxManage'), "VBoxManage not found"
         self.name = name
         self.dir = os.path.join(paths.packer_templates, name)
         self.template = '{}.json'.format(name)
@@ -39,28 +55,51 @@ class VirtualMachine:
         retstr = "Name: {0}\nDirectory: {1}\nTemplate: {2}\n"
         return retstr.format(self.name, self.dir, self.template)
 
-    def checkvm(self):
-        """Raise VirtualMachineError if such VM exists. Else return 0"""
-        with open('/dev/null') as devnull:
-            try:
+    def _checkreg(self):
+        """Check for VM using VBoxManage.
+
+         If exist return True. Else return False
+         """
+        retval = True
+        try:
+            with open('/dev/null') as devnull:
                 subprocess.check_call(['VBoxManage', 'showvminfo', self.name],
                                       stdout=devnull,
                                       stderr=devnull
                                       )
-            except subprocess.CalledProcessError:
-                return 0
-        raise VirtualMachineExistError("{} already exist!".format(self.name))
+        except subprocess.CalledProcessError:
+            retval = False
+        return retval
+
+    def _checkfiles(self):
+        """Check for VM files. Return True if exists. Else False."""
+        mf = get_machine_folder()
+        inroot = os.path.exists(os.path.join(mf, self.name))
+        insu = os.path.exists(os.path.join(mf, paths.vm_group, self.name))
+        return inroot or insu
+
+    def checkvm(self):
+        """Raise VirtualMachineError if such VM exists. Else return 0"""
+        if self._checkreg() or self._checkfiles():
+            err = "{} already exist!".format(self.name)
+            raise VirtualMachineExistError(err)
+        return 0
 
     def removevm(self):
         """Unregister and remove Virtualbox virtual machine."""
+        # Try to unregister VM. Ignore errors.
         with open('/dev/null') as devnull:
             subprocess.call(['VBoxManage', 'unregistervm', self.name],
                             stderr=devnull)
+
+        # Try to remove VM files from paths.vm_group. If no such file
+        # then try to remove it from VirtualBox default machine folder.
+        mf = get_machine_folder()
         try:
-            shutil.rmtree(os.path.join(paths.registered_vms, self.name))
+            shutil.rmtree(os.path.join(mf, paths.vm_group, self.name))
         except OSError as exc:
             if exc.errno == errno.ENOENT:
-                pass
+                shutil.rmtree(os.path.join(mf, self.name))
             else:
                 raise
         return 0
@@ -96,14 +135,10 @@ def count_workers():
     return multiprocessing.cpu_count() // 2
 
 
-class Builder:
-    """Build given list of virtual machines.
+class VMHandler:
+    """Base class for dealing with lists of VirtualMachines
 
-    Constructor require list of VMs as first positional argument.
-    It is safe to specify single string here.
-    Optional argument threads specify the count of worker processes
-    those will actually build VMs from vmlist. The default is
-    multiprocessing.cpu_count().
+    This class must be subclassed.
     """
     _TIMEOUT = 30
     results = []
@@ -118,6 +153,16 @@ class Builder:
     def __str__(self):
         return "VM list:\n%s" % '\n'.join(self.vmlist)
 
+
+class Builder(VMHandler):
+    """Build given list of virtual machines.
+
+    Constructor require list of VMs as first positional argument.
+    It is safe to specify single string here.
+    Optional argument threads specify the count of worker processes
+    those will actually build VMs from vmlist. The default is
+    multiprocessing.cpu_count().
+    """
     def _callback(self, vm):
         print("{} successfully built".format(vm))
         self.results.append(vm)
@@ -202,8 +247,8 @@ class Builder:
         print("Not implemented")
 
 
-class Importer:
-    """Import VMs
+class Importer(VMHandler):
+    """Import VMs...
 
     """
     pass
