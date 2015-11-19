@@ -151,7 +151,7 @@ def just_import(ova):
     Import VM from specified ova and return VM name.
     If VM with such name already exists raise VirtualMachineExistsError.
     """
-    name = os.path.split(ova)[1].rstrip('.ova')
+    name = os.path.split(ova)[1].split('.')[0]
     v_machine = VirtualMachine(name)
     # This must throw exception if such VM already exists.
     try:
@@ -165,7 +165,7 @@ def just_import(ova):
 
 def force_import(ova):
     """Import and group VM. Remove existing if needed."""
-    name = os.path.split(ova)[1].rstrip('.ova')
+    name = os.path.split(ova)[1].split('.')[0]
     v_machine = VirtualMachine(name)
     try:
         v_machine.checkvm()
