@@ -1,6 +1,14 @@
 #!/usr/bin/python3
-"""docstring
+"""The module implemented to build and import virtual machines.
 
+The module uses multiprocessing for build or import a group of virtual
+machines (VM). The number of processes depend on CPU's number.
+VirtualMachine class contains methods to perform actions with single
+VM.
+Class Builder provides building and uploading of a group of VM.
+Class Importer implemented to import an arbitrary number of VM.
+Class Interface provide subcommands and options to make it
+easier to use this module directly.
 """
 
 
@@ -368,8 +376,10 @@ class Importer(VMHandler):
 
 
 class Interface:
-    """Options handler.
+    """Subcommans and options handler.
 
+    This class parse command line arguments and perform actions
+    accordingly to them.
     """
     desc = "Virtual machines building and importing tool."
 
