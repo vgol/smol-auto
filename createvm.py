@@ -1,9 +1,20 @@
 #!/usr/bin/python3
-"""docstring
+"""The module implemented to build and import virtual machines.
 
+The module uses multiprocessing for build or import a group of virtual
+machines (VM). The number of processes depend on CPU's number.
+VirtualMachine class contains methods to perform actions with single
+VM.
+Class Builder provides building and uploading of a group of VM.
+Class Importer implemented to import an arbitrary number of VM.
+Class Interface provide subcommands and options to make it
+easier to use this module directly.
 """
 
 
+from sys import stderr
+from email.mime.text import MIMEText
+from email.header import Header
 import subprocess
 import os
 import shutil
@@ -11,13 +22,15 @@ import errno
 import multiprocessing
 import argparse
 import time
+import smtplib
 import paths
+import infomail
 
 
 __author__ = 'vgol'
 
 
-class VirtualMachineExistError(Exception):
+class VirtualMachineExistsError(Exception):
     """VirtualMachine.checkvm() raise this exception if VM exists."""
     pass
 
@@ -82,7 +95,7 @@ class VirtualMachine:
         """Raise VirtualMachineError if such VM exists. Else return 0"""
         if self._checkreg() or self._checkfiles():
             err = "{} already exist!".format(self.name)
-            raise VirtualMachineExistError(err)
+            raise VirtualMachineExistsError(err)
         return 0
 
     def removevm(self):
@@ -119,15 +132,59 @@ class VirtualMachine:
         return os.path.join(self.dir, paths.packer_export,
                             self.name + '.ova')
 
+    def _groupvm(self):
+        group = '/' + paths.vm_group
+        subprocess.call(['VBoxManage', 'modifyvm', self.name,
+                         '--groups', group])
+
+    def importvm(self, ova):
+        """Import VM and group into paths.vm_group."""
+        assert os.path.exists(ova), "{} not found" % ova
+        subprocess.call(['VBoxManage', 'import', ova,
+                        '--options', 'keepallmacs'])
+        time.sleep(10)
+        self._groupvm()
+        return self.name
+
 
 def build_vm(vmname):
     """Build virtual machine. Remove existing if needed."""
     v_machine = VirtualMachine(vmname)
     try:
         v_machine.checkvm()
-    except VirtualMachineExistError:
+    except VirtualMachineExistsError:
         v_machine.removevm()
     return v_machine.buildvm()
+
+
+def just_import(ova):
+    """Import VM and group it. Return str.
+
+    Import VM from specified ova and return VM name.
+    If VM with such name already exists raise VirtualMachineExistsError.
+    """
+    name = os.path.split(ova)[1].split('.')[0]
+    v_machine = VirtualMachine(name)
+    # This must throw exception if such VM already exists.
+    try:
+        v_machine.checkvm()
+    except VirtualMachineExistsError:
+        print("WARNING: %s already exists. Skipping...")
+    else:
+        v_machine.importvm(ova)
+    return name
+
+
+def force_import(ova):
+    """Import and group VM. Remove existing if needed."""
+    name = os.path.split(ova)[1].split('.')[0]
+    v_machine = VirtualMachine(name)
+    try:
+        v_machine.checkvm()
+    except VirtualMachineExistsError:
+        v_machine.removevm()
+    v_machine.importvm(ova)
+    return name
 
 
 def count_workers():
@@ -153,6 +210,10 @@ class VMHandler:
     def __str__(self):
         return "VM list:\n%s" % '\n'.join(self.vmlist)
 
+    def _callback(self, vm):
+        print("{} successfully handled".format(vm))
+        self.results.append(vm)
+
 
 class Builder(VMHandler):
     """Build given list of virtual machines.
@@ -163,10 +224,6 @@ class Builder(VMHandler):
     those will actually build VMs from vmlist. The default is
     multiprocessing.cpu_count().
     """
-    def _callback(self, vm):
-        print("{} successfully built".format(vm))
-        self.results.append(vm)
-
     def _build_pool(self, procs, lst):
         pool = multiprocessing.Pool(processes=procs)
         for vm in lst:
@@ -233,7 +290,7 @@ class Builder(VMHandler):
                     # Do not raise exception if image file not found.
                     if (imgexc.errno == errno.ENOENT and
                             imgexc.filename == image):
-                        print("{} is missing. Skipping...")
+                        print("{} is missing. Skipping...", file=stderr)
                     else:
                         raise
                 else:
@@ -242,21 +299,87 @@ class Builder(VMHandler):
                 uploaded.append(os.path.split(image)[1])
         return upload_to, uploaded
 
-    def mail(self):
-        """Send mail to employees."""
-        print("Not implemented")
+    @staticmethod
+    def _prepare_message(msg):
+        """Prepare MIME message. Return email.mime.MIMEText."""
+        msg_mime = MIMEText(msg, 'text', 'utf-8')
+        msg_mime['From'] = Header(infomail.fromaddr, charset='utf-8')
+        msg_mime['To'] = Header(', '.join(infomail.toaddrs),
+                                charset='utf-8')
+        msg_mime['Subject'] = Header("VirtualBox images built",
+                                     charset='utf-8')
+        return msg_mime
+
+    def mail(self, upload_dir):
+        """Send info mail using data from imfomail.py
+
+        Argument upload_dir required for making download URL
+         for recipients.
+        Prepare and send message through smtplib.SMTP
+        """
+        url = infomail.download_url.format(os.path.split(upload_dir)[1])
+        mymessage = infomail.text_message.format(url)
+        mymessage = self._prepare_message(mymessage)
+        errpref = "SMTP Problem:"
+        smtpconn = smtplib.SMTP(infomail.smtphost, infomail.smtpport)
+        try:
+            smtpconn.sendmail(infomail.fromaddr,
+                              infomail.toaddrs,
+                              mymessage.as_string())
+        except smtplib.SMTPRecipientsRefused:
+            print(errpref, end=' ', file=stderr)
+            print("All recipients {} refused".format(infomail.toaddrs),
+                  file=stderr)
+        except smtplib.SMTPHeloError:
+            print(errpref, end=' ', file=stderr)
+            print("Server didn't reply properly to the HELLO", file=stderr)
+        except smtplib.SMTPSenderRefused:
+            print(errpref, "Server didn't accept sender", infomail.fromaddr,
+                  file=stderr)
+        except smtplib.SMTPDataError:
+            print(errpref, "Server didn't accept mail data", file=stderr)
+        finally:
+            smtpconn.quit()
 
 
 class Importer(VMHandler):
-    """Import VMs...
+    """Import given list of virtual machines.
 
+    Constructor require list of exported VMs (.ova) as first
+    positional argument. It is safe to specify single string here.
+    Optional argument threads specify the count of worker processes
+    those will actually import VMs from vmlist. The default is
+    multiprocessing.cpu_count().
     """
-    pass
+    def _import_pool(self, procs, lst, func):
+        pool = multiprocessing.Pool(processes=procs)
+        for vm in lst:
+            pool.apply_async(func, args=(vm,), callback=self._callback)
+            time.sleep(self._TIMEOUT)
+        pool.close()
+        pool.join()
+
+    def vmimport(self, func=just_import):
+        """Import virtual machines from self.vmlist."""
+        ovas = len(self.vmlist)
+        if ovas == 1:
+            vmname = func(self.vmlist[0])
+            self.results.append(vmname)
+        elif ovas <= self.threads:
+            self._import_pool(ovas, self.vmlist, func)
+        else:
+            tmplist = self.vmlist
+            while tmplist:
+                self._import_pool(self.threads, tmplist[:self.threads], func)
+                tmplist = tmplist[self.threads:]
+        return self.results
 
 
 class Interface:
-    """Options handler.
+    """Subcommans and options handler.
 
+    This class parse command line arguments and perform actions
+    accordingly to them.
     """
     desc = "Virtual machines building and importing tool."
 
@@ -300,7 +423,7 @@ class Interface:
         self.args = self.parser.parse_args()
 
     @staticmethod
-    def _discover():
+    def _discover_templates():
         """Look into Packer templates dir and return template's list."""
         vms = []
         for file in os.listdir(paths.packer_templates):
@@ -320,18 +443,63 @@ class Interface:
         if self.args.VM_NAME:
             bld = Builder(self.args.VM_NAME)
         else:
-            bld = Builder(self._discover())
+            bld = Builder(self._discover_templates())
         bld.build()
         result = bld.upload()
         if self.args.mail:
-            bld.mail()
+            bld.mail(result[0])
         return result
 
+    @staticmethod
+    def _ova_from_dir(directory):
+        """Retrieve list of .ova from dir. Return list."""
+        res = []
+        for file in os.listdir(directory):
+            if file.endswith('.ova'):
+                res.append(os.path.join(directory, file))
+        return res
+
+    def _prepare_ovas(self):
+        """Get list of .ova from self.args. Return list."""
+        ovalist = []
+        for name in self.args.NAME:
+            if name.endswith('.ova'):
+                ovalist.append(name)
+            elif os.path.isdir(name):
+                ovalist.extend(self._ova_from_dir(name))
+            else:
+                print("%s doesn't looks like directory or OVA" % name,
+                      file=stderr)
+        return ovalist
+
     def _import(self):
-        pass
+        """Get the list of .ova from arguments and import. Return list."""
+        if self.args.force:
+            myfunc = force_import
+        else:
+            myfunc = just_import
+        ovas = self._prepare_ovas()
+        if len(ovas) > 0:
+            imprt = Importer(ovas)
+            result = imprt.vmimport(func=myfunc)
+        else:
+            print("No images found in %s" % self.args.NAME, file=stderr)
+            result = None
+        return result
 
     def main(self):
-        """docstring will be here..."""
+        """Perform actions according to the given command and options.
+
+        Build command:
+        Build from given as arguments list of VMs. If no arguments
+        given then call self._discover to determine the list of VMs
+        from existing Packer templates.
+
+        Import command:
+        Expect at least one argument. If it is directory then all
+        images from that directory will be exported. If it is image
+        or list of images then it will import all of it.
+        """
         if hasattr(self.args, 'VM_NAME'):
             self._build()
         else:
