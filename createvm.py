@@ -5,6 +5,8 @@
 
 
 from sys import stderr
+from email.mime.text import MIMEText
+from email.header import Header
 import subprocess
 import os
 import shutil
@@ -12,7 +14,9 @@ import errno
 import multiprocessing
 import argparse
 import time
+import smtplib
 import paths
+import infomail
 
 
 __author__ = 'vgol'
@@ -287,9 +291,47 @@ class Builder(VMHandler):
                 uploaded.append(os.path.split(image)[1])
         return upload_to, uploaded
 
-    def mail(self):
-        """Send mail to employees."""
-        print("Not implemented")
+    @staticmethod
+    def _prepare_message(msg):
+        """Prepare MIME message. Return email.mime.MIMEText."""
+        msg_mime = MIMEText(msg, 'text', 'utf-8')
+        msg_mime['From'] = Header(infomail.fromaddr, charset='utf-8')
+        msg_mime['To'] = Header(', '.join(infomail.toaddrs),
+                                charset='utf-8')
+        msg_mime['Subject'] = Header("VirtualBox images built",
+                                     charset='utf-8')
+        return msg_mime
+
+    def mail(self, upload_dir):
+        """Send info mail using data from imfomail.py
+
+        Argument upload_dir required for making download URL
+         for recipients.
+        Prepare and send message through smtplib.SMTP
+        """
+        url = infomail.download_url.format(os.path.split(upload_dir)[1])
+        mymessage = infomail.text_message.format(url)
+        mymessage = self._prepare_message(mymessage)
+        errpref = "SMTP Problem:"
+        smtpconn = smtplib.SMTP(infomail.smtphost, infomail.smtpport)
+        try:
+            smtpconn.sendmail(infomail.fromaddr,
+                              infomail.toaddrs,
+                              mymessage.as_string())
+        except smtplib.SMTPRecipientsRefused:
+            print(errpref, end=' ', file=stderr)
+            print("All recipients {} refused".format(infomail.toaddrs),
+                  file=stderr)
+        except smtplib.SMTPHeloError:
+            print(errpref, end=' ', file=stderr)
+            print("Server didn't reply properly to the HELLO", file=stderr)
+        except smtplib.SMTPSenderRefused:
+            print(errpref, "Server didn't accept sender", infomail.fromaddr,
+                  file=stderr)
+        except smtplib.SMTPDataError:
+            print(errpref, "Server didn't accept mail data", file=stderr)
+        finally:
+            smtpconn.quit()
 
 
 class Importer(VMHandler):
@@ -395,7 +437,7 @@ class Interface:
         bld.build()
         result = bld.upload()
         if self.args.mail:
-            bld.mail()
+            bld.mail(result[0])
         return result
 
     @staticmethod
