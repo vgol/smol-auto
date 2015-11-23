@@ -18,7 +18,7 @@ smtphost = 'smtp.cct.rbt'
 smtpport = 25
 fromaddr = 'vgol@cct.rbt'
 toaddrs = ['vgol@cct.rbt', 'tyurin@cct.rbt', 'struchkov@cct.rbt',
-           'kukolev@.cct.rbt', 'anohov@cct.rbt', 'yarik13@cct.rbt']
+           'kukolev@cct.rbt', 'anohov@cct.rbt', 'yarik13@cct.rbt']
 download_url = "ftp://vgol2.cct.rbt/vm/{}"
 text_message = """
 Образы виртуальных машин доступны для скачивания: {}
