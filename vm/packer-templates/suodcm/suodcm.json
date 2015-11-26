@@ -76,9 +76,6 @@
       "vboxmanage_post": [
         [ "modifyvm", "{{.Name}}", "--accelerate3d", "on" ],
         [ "modifyvm", "{{.Name}}", "--accelerate2dvideo", "off" ],
-        [ "sharedfolder", "add", "{{.Name}}", "--name", "git", "--hostpath", "/home/vgol/git", "--automount" ],
-        [ "sharedfolder", "add", "{{.Name}}", "--name", "svn", "--hostpath", "/home/vgol/svn", "--automount" ],
-
         [ "storageattach", "{{.Name}}", "--storagectl", "SATA Controller",
           "--port", "1", "--type", "dvddrive", "--medium", "emptydrive" ],
         [ "modifyvm", "{{.Name}}", "--vrde", "off" ],
