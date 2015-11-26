@@ -12,6 +12,7 @@
         "../shared/wicd.sh",
         "../shared/ntpdate.sh",
         "../shared/vim.sh",
+        "../shared/bashrc.sh",
         "./hosts.sh"
       ],
       "override": {
