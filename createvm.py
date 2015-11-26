@@ -136,6 +136,19 @@ class VirtualMachine:
         group = '/' + paths.vm_group
         subprocess.call(['VBoxManage', 'modifyvm', self.name,
                          '--groups', group])
+        return self.name, group
+
+    def _sharedfolders(self):
+        home = os.environ['HOME']
+        folders = {
+            'git': os.path.join(home, 'git'),
+            'svn': os.path.join(home, 'svn')
+        }
+        for key in folders.keys():
+            subprocess.call(['VBoxManage', 'sharedfolder', 'add',
+                             self.name, '--name', key, '--hostpath',
+                             folders[key], '--automount'])
+        return folders
 
     def importvm(self, ova):
         """Import VM and group into paths.vm_group."""
@@ -143,8 +156,9 @@ class VirtualMachine:
         subprocess.call(['VBoxManage', 'import', ova,
                         '--options', 'keepallmacs'])
         time.sleep(10)
-        self._groupvm()
-        return self.name
+        grouped = self._groupvm()
+        sfolders = self._sharedfolders()
+        return grouped, sfolders
 
 
 def build_vm(vmname):
@@ -446,7 +460,9 @@ class Interface:
             bld = Builder(self._discover_templates())
         bld.build()
         result = bld.upload()
-        if self.args.mail:
+        # Send mail only if asked and Builder.upload() return
+        # not empty 'uploaded' list.
+        if self.args.mail and result[1]:
             bld.mail(result[0])
         return result
 
