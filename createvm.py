@@ -460,7 +460,9 @@ class Interface:
             bld = Builder(self._discover_templates())
         bld.build()
         result = bld.upload()
-        if self.args.mail:
+        # Send mail only if asked and Builder.upload() return
+        # not empty 'uploaded' list.
+        if self.args.mail and result[1]:
             bld.mail(result[0])
         return result
 
