@@ -6,6 +6,7 @@
         "../shared/devel-repo.sh",
         "../shared/build-essential.sh",
         "../shared/linux-headers.sh",
+        "../shared/debhelper.sh",
         "../shared/virtualbox.sh",
         "../shared/rm-udev-persistent-net.sh",
         "../shared/passwd1.sh",
@@ -13,7 +14,10 @@
         "../shared/ntpdate.sh",
         "../shared/vim.sh",
         "../shared/bashrc.sh",
-        "./hosts.sh"
+        "../shared/toggle-hack.sh",
+        "../shared/python-test.sh",
+        "./hosts.sh",
+        "./suac.sh"
       ],
       "override": {
         "virtualbox-iso": {
