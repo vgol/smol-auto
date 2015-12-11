@@ -8,6 +8,7 @@ from time import sleep
 
 
 __author__ = 'vgol'
+__version__ = '0.1'
 
 
 # admin/admin and K/M passwords:

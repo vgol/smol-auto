@@ -12,6 +12,7 @@ text_message - the body of message.
 
 
 __author__ = 'vgol'
+__verson__ = '1.0'
 
 
 smtphost = 'smtp.cct.rbt'
