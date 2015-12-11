@@ -12,6 +12,7 @@ from os.path import join
 
 
 __author__ = 'vgol'
+__version__ = '1.0'
 
 
 packer = "/home/vgol/packer"
