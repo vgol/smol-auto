@@ -184,7 +184,7 @@ def just_import(ova):
     try:
         v_machine.checkvm()
     except VirtualMachineExistsError:
-        print("WARNING: %s already exists. Skipping...")
+        print("WARNING: %s already exists. Skipping..." % name)
     else:
         v_machine.importvm(ova)
     return name
