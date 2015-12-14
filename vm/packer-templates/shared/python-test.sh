@@ -5,28 +5,26 @@
 list="
 python-all
 python3-all
-python3-pytest 
+python3-setuptools 
 dh-python
 python-sphinx
 debhelper
 "
-url="ftp://192.168.32.160/packages/pexpect"
-srcdir="/root/pexpect"
+url="ftp://192.168.32.160/packages"
+pexpect_url="${url}/pexpect"
+pytest_url="${url}/pytest"
+py_version="1.4.31"
+pytest_version="2.8.4"
+pexpect_version="3.3"
 
 
 apt-get -y install $list
 apt-get clean
 
 
-wget -r -nH --cut-dirs=1 -P /root $url
-wait
+# pexpect
+easy_install3 ${pexpect_url}/pexpect-${pexpect_version}.tar.gz
 
-curdir=$PWD
-cd $srcdir
-dpkg-source -x pexpect_*.dsc
-cd pexpect-*
-dpkg-buildpackage -us -uc
-wait
-dpkg -i ../python3-pexpect*.deb
-cd $curdir
-rm -r $srcdir
+# pytest
+easy_install3 ${pytest_url}/py-${py_version}.tar.gz
+easy_install3 ${pytest_url}/pytest-${pytest_version}.tar.gz
