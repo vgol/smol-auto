@@ -12,7 +12,7 @@ import random
 from time import sleep
 
 __author__ = 'vgol'
-__version__ = '0.2'
+__version__ = '0.2.1'
 
 
 def clean_dirs(export_dir):
