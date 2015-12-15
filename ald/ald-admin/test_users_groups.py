@@ -1,6 +1,5 @@
 """Test module for ald-admin user-* and group-* commands."""
 
-
 import pexpect
 import pytest
 import subprocess
@@ -11,7 +10,6 @@ import shlex
 import string
 import random
 from time import sleep
-
 
 __author__ = 'vgol'
 __version__ = '0.2'
@@ -32,11 +30,26 @@ def clean_dirs(export_dir):
 
 def password_generator(length=8):
     """Create random password. Return str."""
-    valid_chars = string.ascii_letters + string.digits + string.punctuation
+    char_classes = [
+        string.ascii_lowercase,
+        string.ascii_uppercase,
+        string.digits,
+        string.punctuation
+    ]
     password = ''
     while len(password) < length:
-        password = password + random.choice(valid_chars)
-    return password
+        if len(char_classes) > 0:
+            char_class = random.choice(char_classes)
+            char_classes.remove(char_class)
+        else:
+            char_class = string.ascii_letters + string.digits
+        char_class_count = random.randint(2, 3)
+
+        while char_class_count > 0:
+            password = password + random.choice(char_class)
+            char_class_count -= 1
+
+    return password[:length]
 
 
 @pytest.fixture(scope='module')
