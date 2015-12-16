@@ -15,16 +15,22 @@ fs_types = [
     'ext3',
     'ext4',
     'vfat',
-    'ntfs'
+    'ntfs',
+    'minix',
+    'exfat'
 ]
 # FS from this list expected to fail test_mac.
 mac_xfail = [
     'vfat',
-    'ntfs'
+    'ntfs',
+    'minix',
+    'exfat'
 ]
 # FS from this list expected to fail test_audit.
 audit_xfail = [
-    'vfat'
+    'vfat',
+    'minix',
+    'exfat'
 ]
 tfile = '/mnt/testfile'
 
@@ -40,12 +46,9 @@ def preparefs(request):
     with open(image, 'wb') as img, open('/dev/zero', 'rb') as zero:
         img.write(zero.read(img_size))
     if re.match('(ext[2-4]|ntfs)', request.param):
-        mkfs = "/sbin/mkfs.{0} -F {1}".format(request.param, image)
+        _create_img_default(request.param, image)
     else:
-        mkfs= "/sbin/mkfs.{0} {1}".format(request.param, image)
-    call(shlex.split(mkfs))
-    mount = "mount -o loop {img} /mnt".format(img=image)
-    call(shlex.split(mount))
+        _create_img_simple(request.param, image)
 
     def cleaning():
         call(['umount', image])
@@ -53,6 +56,28 @@ def preparefs(request):
 
     request.addfinalizer(cleaning)
     return image
+
+
+def _create_img_default(fs, img):
+    """Default function for preparing image.
+
+    It works for ext2, ext3, ext4, ntfs.
+    """
+    mkfs = "/sbin/mkfs.{0} -F {1}".format(fs, img)
+    call(shlex.split(mkfs))
+    mount = "mount -o loop {img} /mnt".format(img=img)
+    call(shlex.split(mount))
+
+
+def _create_img_simple(fs, img):
+    """Create image and make FS without '-F' flag.
+
+    It works for exFAT, FAT32, minix.
+    """
+    mkfs = "/sbin/mkfs.{0} {1}".format(fs, img)
+    call(shlex.split(mkfs))
+    mount = "mount -o loop {img} /mnt".format(img=img)
+    call(shlex.split(mount))
 
 
 def _mount_img(image):
