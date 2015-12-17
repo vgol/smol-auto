@@ -16,6 +16,7 @@
         "../shared/bashrc.sh",
         "../shared/toggle-hack.sh",
         "../shared/python-test.sh",
+        "../shared/exfat.sh",
         "./hosts.sh",
         "./susrv.sh"
       ],
