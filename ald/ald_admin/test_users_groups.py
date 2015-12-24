@@ -127,7 +127,7 @@ class TestCreateUsers:
     def test_default_validname_user(self, ald_fixture, user):
         """Create user with all default settings."""
         user_password = password_generator()
-        adm = pexpect.spawnu(' cmd', timeout=3)
+        adm = pexpect.spawnu('ald-admin cmd', timeout=3)
         adm.logfile = sys.stdout
         enter = adm.sendline
         matched = adm.expect(['>( |\t)', pexpect.EOF, pexpect.TIMEOUT])
