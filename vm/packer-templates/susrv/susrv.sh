@@ -11,5 +11,5 @@ dovecot-gssapi
 postgresql-astra
 "
 
-apt-get -y install $list
+apt-get -y install ${list}
 apt-get clean

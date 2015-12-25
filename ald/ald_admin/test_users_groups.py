@@ -9,10 +9,10 @@ import shutil
 import shlex
 import string
 import random
-from time import sleep
+
 
 __author__ = 'vgol'
-__version__ = '0.2.1'
+__version__ = '0.2.2'
 
 
 def clean_dirs(export_dir):
@@ -150,8 +150,12 @@ class TestCreateUsers:
             enter()
         adm.expect(self.create_user_dialog['18-correct'])
         adm.sendline('y')
-        sleep(1)
+        adm.expect('> ')
+        adm.sendline('exit')
+        adm.wait()
         # Checks
+        assert adm.exitstatus == 0
+        assert not adm.isalive()
         userget = "ald-admin user-get {usr} -f --pass-file={pwd}"
         userget = userget.format(usr=user, pwd=ald_fixture[1])
         sproc = subprocess.Popen(shlex.split(userget),
